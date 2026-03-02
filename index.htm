@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粵語 /ts-/ 之音詞語抽籤機</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #FFFAEC;
+            /* 使用標準系統字體，優先調用細明體或微軟正黑體 */
+            font-family: "PMingLiU", "MingLiU", "Microsoft JhengHei", "Apple LiGothic Medium", sans-serif;
+        }
+
+        .slot-column {
+            height: 120px;
+            overflow: hidden;
+            border: 4px solid #FFD700;
+            border-radius: 15px;
+            background: white;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .slot-list {
+            transition: transform 1.5s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+        }
+
+        .slot-item {
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #333;
+            text-align: center;
+            padding: 0 10px;
+            /* 確保列表內的文字也使用標準字體 */
+            font-family: inherit;
+        }
+
+        .lever {
+            width: 20px;
+            height: 100px;
+            background: #ccc;
+            border-radius: 10px;
+            position: relative;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .lever-ball {
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle, #ff4d4d, #b30000);
+            border-radius: 50%;
+            position: absolute;
+            top: -20px;
+            left: -10px;
+            transition: 0.3s;
+        }
+
+        .lever.active {
+            transform: scaleY(0.5);
+            transform-origin: bottom;
+        }
+
+        .machine-body {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+            border: 8px solid #FFD700;
+            border-radius: 30px;
+            padding: 20px;
+            box-shadow: 0 20px 0 #D84315, 0 30px 50px rgba(0,0,0,0.3);
+        }
+
+        /* 顏色分類保持不變，但移除手寫字體設定 */
+        .character { color: #E91E63; }
+        .action { color: #2196F3; }
+        .object { color: #4CAF50; }
+        .place { color: #FF9800; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="max-w-4xl w-full">
+        <h1 class="text-3xl md:text-5xl text-center mb-12 font-bold text-orange-600 drop-shadow-sm">
+            🎡 粵語 /ts-/ 之音大挑戰!
+        </h1>
+
+        <div class="flex flex-col md:flex-row items-center justify-center gap-12">
+            <!-- Slot Machine -->
+            <div class="machine-body w-full max-w-2xl relative">
+                <div class="grid grid-cols-4 gap-2 md:gap-4 relative z-0">
+                    <div class="slot-column"><div id="list-subjects" class="slot-list"></div></div>
+                    <div class="slot-column"><div id="list-actions" class="slot-list"></div></div>
+                    <div class="slot-column"><div id="list-objects" class="slot-list"></div></div>
+                    <div class="slot-column"><div id="list-places" class="slot-list"></div></div>
+                </div>
+
+                <div class="mt-6 flex justify-around text-white font-bold text-xs md:text-sm">
+                    <span>人物</span>
+                    <span>動作</span>
+                    <span>事物</span>
+                    <span>地方</span>
+                </div>
+            </div>
+
+            <!-- Lever -->
+            <div class="flex flex-col items-center">
+                <div id="lever" class="lever" onclick="spin()">
+                    <div class="lever-ball"></div>
+                </div>
+                <p class="mt-4 font-bold text-orange-700">拉一下！</p>
+            </div>
+        </div>
+
+        <div class="mt-12 text-center text-sm text-orange-800 bg-orange-100 p-4 rounded-xl max-w-lg mx-auto">
+            請運用以上詞語創作短句。
+        </div>
+    </div>
+
+    <script>
+        const data = {
+            subjects: ["蜘蛛", "豬仔", "俊仔", "俊俊", "自選"],
+            actions: ["走", "摘", "炸", "扎", "找", "著", "轉", "指著", "種植", "整", "撞", "摺", "煮", "蒸", "捉", "追逐", "讚"],
+            objects: ["礁石", "宗教", "照片", "仙人掌", "紫薯", "炸雞膇", "芝麻油", "孜然粉", "支付寶", "竹葉", "山楂餅", "三文治", "珍珠鏈", "幾張紙", "鹼水粽", "胡椒種子", "植物"],
+            places: ["香港仔", "灣仔", "鑽石山站", "中轉站", "置富", "置富都會", "展覽廳", "黃竹坑"]
+        };
+
+        const itemHeight = 120;
+        let isSpinning = false;
+
+        function initSlot(id, items, className) {
+            const list = document.getElementById(id);
+            // 為了平滑滾動，重複內容
+            const content = [...items, ...items, ...items].map(item => 
+                `<div class="slot-item ${className}">${item}</div>`
+            ).join('');
+            list.innerHTML = content;
+        }
+
+        initSlot('list-subjects', data.subjects, 'character');
+        initSlot('list-actions', data.actions, 'action');
+        initSlot('list-objects', data.objects, 'object');
+        initSlot('list-places', data.places, 'place');
+
+        function playSound(type) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                
+                if (type === 'lever') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(150, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                } else if (type === 'stop') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(440, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                }
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.1);
+            } catch (e) {
+                console.log("Audio play failed", e);
+            }
+        }
+
+        function spin() {
+            if (isSpinning) return;
+            isSpinning = true;
+
+            playSound('lever');
+            const lever = document.getElementById('lever');
+            lever.classList.add('active');
+            setTimeout(() => lever.classList.remove('active'), 200);
+
+            const configs = [
+                { id: 'list-subjects', items: data.subjects },
+                { id: 'list-actions', items: data.actions },
+                { id: 'list-objects', items: data.objects },
+                { id: 'list-places', items: data.places }
+            ];
+
+            configs.forEach((config, index) => {
+                const el = document.getElementById(config.id);
+                const randomIndex = Math.floor(Math.random() * config.items.length);
+                const finalPos = (config.items.length + randomIndex) * itemHeight;
+                
+                setTimeout(() => {
+                    el.style.transform = `translateY(-${finalPos}px)`;
+                    if (index === configs.length - 1) {
+                        setTimeout(() => {
+                            isSpinning = false;
+                            playSound('stop');
+                        }, 1500);
+                    }
+                }, index * 150);
+            });
+        }
+    </script>
+</body>
+</html>
